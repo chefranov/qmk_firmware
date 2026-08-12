@@ -190,6 +190,14 @@ void wireless_disconnect(void) {
     if (wireless_transport.disconnect) wireless_transport.disconnect();
 }
 
+/*
+ * Report the battery level to the host. The module forwards it over whichever
+ * wireless link is active, so this covers both bluetooth and 2.4G.
+ */
+void wireless_update_bat_level(uint8_t level) {
+    if (wireless_transport.update_bat_level) wireless_transport.update_bat_level(level);
+}
+
 /* Called when the BT device is reset. */
 static void wireless_enter_reset(uint8_t reason) {
     kc_printf("wireless_enter_reset\n\r");
@@ -247,7 +255,7 @@ static void wireless_enter_connected(uint8_t host_idx) {
     if (battery_is_empty()) {
         indicator_battery_low_enable(true);
     }
-    if (wireless_transport.update_bat_level) wireless_transport.update_bat_level(battery_get_percentage());
+    wireless_update_bat_level(battery_get_percentage());
     lpm_timer_reset();
 }
 

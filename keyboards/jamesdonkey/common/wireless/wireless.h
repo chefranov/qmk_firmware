@@ -75,6 +75,7 @@ bool wireless_event_enqueue(wireless_event_t event);
 void wireless_connect(void);
 void wireless_connect_ex(uint8_t host_idx, uint16_t timeout);
 void wireless_disconnect(void);
+void wireless_update_bat_level(uint8_t level);
 
 void wireless_pairing(void);
 void wireless_pairing_ex(uint8_t host_idx, void *param);

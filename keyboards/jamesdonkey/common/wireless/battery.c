@@ -61,6 +61,7 @@ static uint8_t  bat_empty                = 0;
 static uint8_t  critical_low             = 0;
 static uint8_t  bat_state;
 static uint8_t  power_on_sample = 0;
+static uint8_t  reported_percentage = 0xFF;
 
 #ifdef SIDE_LED_VDD
 extern void side_light_power_off(void);
@@ -139,8 +140,35 @@ __attribute__((weak)) void battery_calculate_voltage(bool vol_src_bt, uint16_t v
     battery_set_voltage(voltage);
 }
 
+/* The pack is sampled under load, and the current burst of a radio transmission
+   sags it by well over 100mV. With 7.5mV per percentage point that is enough to
+   swing the reported level by twenty points between two consecutive readings, so
+   take the median of the last few samples: unlike an average it discards isolated
+   dips outright instead of letting them pull the result down. */
+#define VOLTAGE_MEDIAN_SAMPLES 5
+static uint16_t voltage_samples[VOLTAGE_MEDIAN_SAMPLES];
+static uint8_t  voltage_sample_count = 0;
+static uint8_t  voltage_sample_next  = 0;
+
 void battery_set_voltage(uint16_t value) {
-    voltage = value;
+    voltage_samples[voltage_sample_next] = value;
+    voltage_sample_next                  = (voltage_sample_next + 1) % VOLTAGE_MEDIAN_SAMPLES;
+    if (voltage_sample_count < VOLTAGE_MEDIAN_SAMPLES) voltage_sample_count++;
+
+    uint16_t sorted[VOLTAGE_MEDIAN_SAMPLES];
+    memcpy(sorted, voltage_samples, voltage_sample_count * sizeof(uint16_t));
+
+    for (uint8_t i = 1; i < voltage_sample_count; i++) {
+        uint16_t key = sorted[i];
+        int8_t   j   = i - 1;
+        while (j >= 0 && sorted[j] > key) {
+            sorted[j + 1] = sorted[j];
+            j--;
+        }
+        sorted[j + 1] = key;
+    }
+
+    voltage = sorted[voltage_sample_count / 2];
 }
 
 uint16_t battery_get_voltage(void) {
@@ -233,6 +261,18 @@ void battery_task(void) {
 
             battery_measure();
             if (power_on_sample < VOLTAGE_POWER_ON_MEASURE_COUNT) power_on_sample++;
+        }
+
+        /* The level used to be pushed only once, from wireless_enter_connected(), so
+           the host kept displaying whatever it was at the moment of connection while
+           the measurements below carried on unreported. Send an update whenever the
+           computed percentage actually changes. */
+        if (wireless_get_state() == WT_CONNECTED) {
+            uint8_t percentage = battery_get_percentage();
+            if (percentage != reported_percentage) {
+                reported_percentage = percentage;
+                wireless_update_bat_level(percentage);
+            }
         }
     }
 
