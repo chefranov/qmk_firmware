@@ -147,8 +147,11 @@ void wireless_enter_reset_kb(uint8_t reason) {
 void wireless_enter_disconnected_kb(uint8_t host_idx, uint8_t reason) {
 
     /* CKBT51 bluetooth module boot time is slower, it enters disconnected after boot,
-       so we place initialization here. */
-    if (firstDisconnect && timer_read32() < 1000) {
+       so we place initialization here. The one-shot flag alone identifies that first
+       post-boot disconnect; the tick-based window this used to carry was unreliable,
+       because the system tick is halted during STOP mode and so kept the window open
+       for minutes of wall time, letting a later disconnect re-run the init. */
+    if (firstDisconnect) {
         lkbt51_param_init();
         if (get_transport() == TRANSPORT_BLUETOOTH) wireless_connect();
         firstDisconnect = false;

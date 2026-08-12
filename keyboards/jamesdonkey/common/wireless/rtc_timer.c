@@ -15,10 +15,9 @@
  */
 
 #include "hal.h"
+#include "rtc_timer.h"
 
 #if (HAL_USE_RTC)
-
-#    include "rtc_timer.h"
 
 void rtc_timer_init(void) {
     rtc_timer_clear();
@@ -38,6 +37,23 @@ uint32_t rtc_timer_read_ms(void) {
 
 uint32_t rtc_timer_elapsed_ms(uint32_t last) {
     return TIMER_DIFF_32(rtc_timer_read_ms(), last);
+}
+
+#else
+
+/* No RTC available: fall back to the system tick. Note that the tick is halted
+   while the MCU is in STOP mode, so timeouts that span sleep will under-count. */
+
+void rtc_timer_init(void) {}
+
+void rtc_timer_clear(void) {}
+
+uint32_t rtc_timer_read_ms(void) {
+    return timer_read32();
+}
+
+uint32_t rtc_timer_elapsed_ms(uint32_t last) {
+    return timer_elapsed32(last);
 }
 
 #endif

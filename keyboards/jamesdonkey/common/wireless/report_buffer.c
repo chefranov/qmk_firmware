@@ -113,11 +113,12 @@ void report_buffer_task(void) {
 
         if (!retry) {
             if (report_buffer_dequeue(&kb_rpt) && kb_rpt.type != REPORT_TYPE_NONE) {
-                if (timer_read32() > 2) {
-                    pending_data      = true;
-                    retry             = RETPORT_RETRY_COUNT;
-                    retry_time_buffer = timer_read32();
-                }
+                /* The pacing for this branch already comes from report_buffer_next_inverval()
+                   above. A guard here compared the absolute tick against 2, which is true
+                   for all but the first 2ms after boot, so it never gated anything. */
+                pending_data      = true;
+                retry             = RETPORT_RETRY_COUNT;
+                retry_time_buffer = timer_read32();
             }
         } else {
             if (timer_elapsed32(retry_time_buffer) > 2) {

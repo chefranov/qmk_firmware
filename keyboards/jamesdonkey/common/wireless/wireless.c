@@ -152,8 +152,12 @@ void wireless_pairing_ex(uint8_t host_idx, void *param) {
  * Initiate connection request to paired host
  */
 void wireless_connect(void) {
-    /*  Work around empty report after wakeup, which leads to reconneect/disconnected loop */
-    if (battery_is_critical_low() || timer_read32() == 0) return;
+    /* The reconnect/disconnect loop this guarded against was caused by the first-disconnect
+       handler in wireless_common.c re-running long after boot, and by lkbt51_wake() skipping
+       its wake pulse; both are fixed at the source. The tick test that used to sit here
+       ("timer_read32() == 0") only ever held during the first millisecond after a cold boot,
+       since the tick never returns to zero afterwards, so it never caught the wakeup case. */
+    if (battery_is_critical_low()) return;
 
     if (wireless_state == WT_RECONNECTING && !indicator_is_running()) {
         indicator_set(wireless_state, host_index);

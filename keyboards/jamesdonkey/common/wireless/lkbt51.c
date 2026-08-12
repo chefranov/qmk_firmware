@@ -22,6 +22,7 @@
 #include "raw_hid.h"
 #include "report_buffer.h"
 #include "factory_test.h"
+#include "rtc_timer.h"
 
 extern void factory_test_send(uint8_t* payload, uint8_t length);
 
@@ -222,8 +223,11 @@ void lkbt51_init(bool wakeup_from_low_power_mode) {
 }
 
 static inline void lkbt51_wake(void) {
-    if (timer_elapsed32(wake_time) > 3000) {
-        wake_time = timer_read32();
+    /* Must be measured on the RTC: the system tick is halted while the MCU sits
+       in STOP mode, so a tick-based interval would still read as "just woken"
+       after minutes of sleep and the wake pulse would be skipped. */
+    if (rtc_timer_elapsed_ms(wake_time) > 3000) {
+        wake_time = rtc_timer_read_ms();
 
         palWriteLine(BLUETOOTH_INT_OUTPUT_PIN, 0);
         wait_ms(10);
@@ -254,7 +258,7 @@ void lkbt51_send_protocol_ver(uint16_t ver) {
     spiStart(&WT_DRIVER, &spicfg);
     spiSelect(&WT_DRIVER);
     spiSend(&WT_DRIVER, i, pkt);
-    spiUnselectI(&WT_DRIVER);
+    spiUnselect(&WT_DRIVER);
     spiStop(&WT_DRIVER);
 #endif
 }
@@ -288,15 +292,12 @@ void lkbt51_send_cmd(uint8_t* payload, uint8_t len, bool ack_enable, bool retry)
     pkt[i++] = checksum & 0xFF;
     pkt[i++] = (checksum >> 8) & 0xFF;
 #if HAL_USE_SPI
-    if ((payload[0] & 0xF0) == 0x60)
-        expect_len = 64;
-    else
-        expect_len = 64;
+    expect_len = 64;
 
     spiStart(&WT_DRIVER, &spicfg);
     spiSelect(&WT_DRIVER);
     spiSend(&WT_DRIVER, i, pkt);
-    spiUnselectI(&WT_DRIVER);
+    spiUnselect(&WT_DRIVER);
     spiStop(&WT_DRIVER);
 #endif
 }
@@ -611,7 +612,7 @@ void lkbt51_write_customize_data(uint8_t* data, uint8_t len) {
     spiSelect(&WT_DRIVER);
     spiSend(&WT_DRIVER, i, pkt);
     spiSend(&WT_DRIVER, len, data);
-    spiUnselectI(&WT_DRIVER);
+    spiUnselect(&WT_DRIVER);
     spiStop(&WT_DRIVER);
 #endif
 

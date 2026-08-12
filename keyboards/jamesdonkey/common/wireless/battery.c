@@ -180,6 +180,12 @@ void battery_check_empty(void) {
 #endif
             }
         }
+    } else if (bat_empty <= BATTERY_EMPTY_COUNT) {
+        /* Require consecutive low readings, as battery_check_critical_low() does.
+           Without this reset the counter accumulated isolated voltage sags (e.g. the
+           current burst of a bluetooth transmission) and eventually latched on a
+           perfectly healthy battery. */
+        bat_empty = 0;
     }
 }
 
