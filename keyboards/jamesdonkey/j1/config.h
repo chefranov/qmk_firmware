@@ -108,10 +108,9 @@
 /* Keep USB connection in blueooth mode */
 #    define KEEP_USB_CONNECTION_IN_WIRELESS_MODE
 
-/* Deep sleep disabled: the board resumes from STOP without restoring the key
-   matrix, so it stays connected but stops registering key presses. Costs battery
-   life. Remove once the resume path is fixed and verified on hardware. */
-#    define LK_DISABLE_STOP_MODE
+/* Deep sleep under test; define LK_DISABLE_STOP_MODE here to turn it off again if
+   the board stops registering key presses after sleeping. */
+// #    define LK_DISABLE_STOP_MODE
 
 /* Enable bluetooth NKRO */
 #    define WIRELESS_NKRO_ENABLE
