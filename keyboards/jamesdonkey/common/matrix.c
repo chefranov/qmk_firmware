@@ -161,6 +161,26 @@ void select_all_cols(void) {
     }
 }
 
+#if defined(LK_WIRELESS_ENABLE)
+/* Overrides the weak version in lpm.c, which only releases the row wake-up events.
+   That is not enough here: HC595_DS shares a pin with SPI MOSI (A7 on J1), and
+   lpm_pre_wakeup() hands that pin back to the SPI peripheral on resume. Unless the
+   shift register lines are re-claimed as outputs, every subsequent column select
+   writes into an alternate-function pin and is lost, so the matrix scans as if no
+   key were ever pressed - the board is awake and still connected, but deaf. */
+void matrix_exit_low_power(void) {
+    for (uint8_t x = 0; x < MATRIX_ROWS; x++) {
+        if (row_pins[x] != NO_PIN) {
+            palDisableLineEvent(row_pins[x]);
+        }
+    }
+
+    setPinOutput(HC595_DS);
+    setPinOutput(HC595_STCP);
+    setPinOutput(HC595_SHCP);
+}
+#endif
+
 static void matrix_read_rows_on_col(matrix_row_t current_matrix[], uint8_t current_col, matrix_row_t row_shifter) {
     // Select col
     select_col(current_col); // select col
