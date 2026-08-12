@@ -148,14 +148,6 @@ __attribute__((weak)) void lpm_enter_low_power(void) {
     // PWR->CR2 &= ~PWR_CR2_USV; /*PWR_CR2_USV is available on STM32L4x2xx and STM32L4x3xx devices only. */
 #endif
 
-    /* Arm the key matrix for wake-up BEFORE tearing down SPI. On boards where the
-       column shift register shares a line with the SPI bus (J1: HC595_DS and
-       SPI_MOSI are both A7), reconfiguring that line as an input first makes the
-       "select all columns" write silently go nowhere, no column is driven, a key
-       press cannot pull a row down, and the board never wakes from STOP. The
-       shift register latches its outputs, so the pins may be released afterwards. */
-    matrix_enter_low_power();
-
 #if (HAL_USE_SPI == TRUE)
     spiStop(&SPI_DRIVER);
     palSetLineMode(SPI_SCK_PIN, PAL_MODE_INPUT_PULLDOWN);
@@ -173,6 +165,7 @@ __attribute__((weak)) void lpm_enter_low_power(void) {
 #ifdef BT_MODE_SELECT_PIN
     palEnableLineEvent(BT_MODE_SELECT_PIN, PAL_EVENT_MODE_BOTH_EDGES);
 #endif
+    matrix_enter_low_power();
 
 #if defined(DIP_SWITCH_PINS)
 #    define NUMBER_OF_DIP_SWITCHES (sizeof(dip_switch_pad) / sizeof(pin_t))
@@ -274,9 +267,9 @@ __attribute__((weak)) void lpm_peripheral_exit_low_power(void) {}
 bool allow_low_power_mode(pm_t mode) {
 #if defined(LK_DISABLE_STOP_MODE)
     /* Escape hatch: refuse deep sleep entirely, so none of the peripheral teardown
-       in lpm_enter_low_power() runs. Costs battery life, but keeps the matrix alive
-       on boards where the resume path does not restore it. Remove the define in
-       config.h once waking is proven to work. */
+       in lpm_enter_low_power() runs and the board simply never sleeps. Costs battery
+       life; kept as a one-line way to rule the sleep path out if waking ever breaks
+       again. Normally left undefined. */
     if (mode > PM_SLEEP) return false;
 #endif
 
