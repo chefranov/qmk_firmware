@@ -30,6 +30,7 @@
 #ifdef LK_WIRELESS_ENABLE
 #    include "lkbt51.h"
 #    include "wireless.h"
+#    include "battery.h"
 #endif
 
 #if defined(LK_WIRELESS_ENABLE) && defined(RAW_ENABLE)
@@ -245,6 +246,7 @@ enum {
     kc_get_firmware_version = 0xA1,
     kc_get_support_feature  = 0xA2,
     kc_get_default_layer    = 0xA3,
+    kc_get_battery_level    = 0xA4,
 };
 
 enum {
@@ -320,6 +322,16 @@ bool via_command_kb(uint8_t *data, uint8_t length) {
         case kc_get_default_layer:
             data[1] = get_highest_layer(default_layer_state | layer_state);
             break;
+
+#ifdef LK_WIRELESS_ENABLE
+        case kc_get_battery_level:
+            /* The battery level is otherwise only pushed into the wireless module, which
+               exposes it through the bluetooth battery service - so a host reached through
+               the 2.4GHz receiver has no way to ask for it. Answer the query here as well.
+               Ported from Keychron/qmk_firmware#504. */
+            data[1] = battery_get_percentage();
+            break;
+#endif
 
 #ifdef ANANLOG_MATRIX
         case 0xA9:
