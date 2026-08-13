@@ -18,6 +18,9 @@
 #include "common.h"
 #include "raw_hid.h"
 #include "version.h"
+#ifdef VIA_ENABLE
+#    include "via.h"
+#endif
 #include "eeconfig.h"
 #include "common.h"
 #ifdef FACTORY_TEST_ENABLE
@@ -26,6 +29,21 @@
 
 #ifdef LK_WIRELESS_ENABLE
 #    include "lkbt51.h"
+#    include "wireless.h"
+#endif
+
+#if defined(LK_WIRELESS_ENABLE) && defined(RAW_ENABLE)
+/* Override of the core's weak raw_hid_send(). Launcher/VIA traffic also arrives over
+   the wireless link when the keyboard is reached through the 2.4GHz receiver, and the
+   reply has to leave by the same route - the USB endpoint is not connected then. */
+void raw_hid_send(uint8_t *data, uint8_t length) {
+    if (raw_hid_get_src() == RAW_HID_SRC_WIRELESS) {
+        wireless_send_raw_hid(data, length);
+        return;
+    }
+
+    usb_raw_hid_send(data, length);
+}
 #endif
 
 #ifdef LED_MATRIX_ENABLE
@@ -252,6 +270,26 @@ void get_support_feature(uint8_t *data) {
 
 bool via_command_kb(uint8_t *data, uint8_t length) {
     switch (data[0]) {
+#if defined(VIA_ENABLE) && defined(LK_WIRELESS_ENABLE) && defined(RAW_ENABLE)
+        case id_get_protocol_version:
+            /* Over the cable the host reads VID/PID off the USB descriptor, but a host
+               talking through the 2.4GHz receiver sees the receiver's own descriptor and
+               has to ask the keyboard who it is. Without this answer Keychron Launcher
+               reports "firmware does not support wireless connection" and refuses to
+               configure the board over the dongle. Returning false lets via.c fill in
+               the protocol version in data[1..2] and send the packet; the identity
+               bytes placed here are further along and survive untouched. */
+            if (raw_hid_get_src() != RAW_HID_SRC_USB) {
+                data[3] = VENDOR_ID >> 8;
+                data[4] = VENDOR_ID & 0xFF;
+                data[5] = PRODUCT_ID >> 8;
+                data[6] = PRODUCT_ID & 0xFF;
+                data[7] = DEVICE_VER >> 8;
+                data[8] = DEVICE_VER & 0xFF;
+            }
+            return false;
+#endif
+
         case kc_get_protocol_version:
 #if defined(WEB_DRIVER_KEYCHRON)
             data[1] = KC_PROTOCOL_VERSION >> 8;

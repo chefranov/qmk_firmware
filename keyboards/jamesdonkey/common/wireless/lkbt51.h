@@ -110,6 +110,9 @@ void lkbt51_send_nkro(uint8_t* report);
 void lkbt51_send_consumer(uint16_t report);
 void lkbt51_send_system(uint16_t report);
 void lkbt51_send_mouse(uint8_t* report);
+#ifdef RAW_ENABLE
+void lkbt51_send_raw_hid(uint8_t* data, uint8_t len);
+#endif
 #ifdef JOYSTICK_ENABLE
 void lkbt51_send_joysticks(uint8_t* report);
 #endif

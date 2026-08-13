@@ -41,6 +41,7 @@ typedef struct {
         uint8_t led;       /* Parameters to EVT_HID_INDICATOR event */
         uint8_t protocol;  /* Parameters to EVT_HID_SET_PROTOCOL event */
         uint8_t interval;  /* Parameters to EVT_CONECTION_INTERVAL event */
+        uint8_t *raw_hid_data; /* Parameters to EVT_RAW_HID event */
         uint8_t *p;
     } params;
     uint8_t data;

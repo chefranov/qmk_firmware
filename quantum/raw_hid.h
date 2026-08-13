@@ -28,4 +28,10 @@ void raw_hid_receive(uint8_t *data, uint8_t length);
  */
 void raw_hid_send(uint8_t *data, uint8_t length);
 
+/**
+ * \brief Send an HID report over the USB endpoint, bypassing any keyboard-level
+ * routing. Call this from a raw_hid_send() override to reach the cable.
+ */
+void usb_raw_hid_send(uint8_t *data, uint8_t length);
+
 /** \} */

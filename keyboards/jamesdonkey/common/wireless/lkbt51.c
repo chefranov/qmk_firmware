@@ -98,6 +98,11 @@ enum {
     LKBT51_CMD_FACTORY_RESET = 0x71,
     LKBT51_CMD_IO_TEST       = 0x72,
     LKBT51_CMD_RADIO_TEST    = 0x73,
+    /* Raw HID tunnelled over the wireless link, used by Keychron Launcher/VIA when
+       the keyboard is reached through the 2.4GHz receiver instead of the cable. */
+    LKBT51_CMD_RAW_HID_INIT = 0x91,
+    LKBT51_CMD_RAW_HID_RX   = 0x92,
+    LKBT51_CMD_RAW_HID_TX   = 0x93,
     /* Event */
     LKBT51_EVT_LKBT51_CMD_RECEIVED = 0xA1,
     LKBT51_EVT_OTA_RSP             = 0xA3,
@@ -161,6 +166,9 @@ wt_func_t wireless_transport = {
     lkbt51_send_consumer,
     lkbt51_send_system,
     lkbt51_send_mouse,
+#ifdef RAW_ENABLE
+    lkbt51_send_raw_hid,
+#endif
     lkbt51_update_bat_lvl,
     lkbt51_task
 };
@@ -387,6 +395,24 @@ void lkbt51_send_mouse(uint8_t* report) {
 
     lkbt51_send_cmd(payload, i, false, false);
 }
+
+#ifdef RAW_ENABLE
+/* Hand a raw HID reply to the module so it reaches the host over the wireless link.
+   The payload is one full RAW_EPSIZE report, which fits PACKET_MAX_LEN with the
+   command byte in front. */
+void lkbt51_send_raw_hid(uint8_t* data, uint8_t len) {
+    uint8_t i = 0;
+    memset(payload, 0, PACKET_MAX_LEN);
+
+    if (len > PACKET_MAX_LEN - 1) len = PACKET_MAX_LEN - 1;
+
+    payload[i++] = LKBT51_CMD_RAW_HID_TX;
+    memcpy(payload + i, data, len);
+    i += len;
+
+    lkbt51_send_cmd(payload, i, false, false);
+}
+#endif
 
 /* Send ack to connection event, wireless module will retry 2 times if no ack received */
 void lkbt51_send_conn_evt_ack(void) {
@@ -755,6 +781,16 @@ static void lkbt51_event_handler(uint8_t evt_type, uint8_t* data, uint8_t len, u
             lkbt51_dfu_tx(LKBT51_EVT_OTA_RSP, data, len, sn);
 #endif
             break;
+#ifdef RAW_ENABLE
+        case LKBT51_CMD_RAW_HID_RX: {
+            kc_printf("LKBT51_CMD_RAW_HID_RX\n");
+            static uint8_t raw_hid_data[RAW_EPSIZE];
+            memset(raw_hid_data, 0, sizeof(raw_hid_data));
+            memcpy(raw_hid_data, data, len > sizeof(raw_hid_data) ? sizeof(raw_hid_data) : len);
+            event.evt_type            = EVT_RAW_HID;
+            event.params.raw_hid_data = raw_hid_data;
+        } break;
+#endif
         default:
             kc_printf("Unknown event!!!\n");
             break;

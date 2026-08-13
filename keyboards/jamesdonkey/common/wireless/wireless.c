@@ -26,6 +26,10 @@
 #include "task.h"
 #include "raw_hid.h"
 
+#ifndef RAW_EPSIZE
+#    define RAW_EPSIZE 32
+#endif
+
 extern uint8_t         pairing_indication;
 extern host_driver_t   chibios_driver;
 extern report_buffer_t kb_rpt;
@@ -197,6 +201,23 @@ void wireless_disconnect(void) {
 void wireless_update_bat_level(uint8_t level) {
     if (wireless_transport.update_bat_level) wireless_transport.update_bat_level(level);
 }
+
+#ifdef RAW_ENABLE
+static raw_hid_src_t raw_hid_src = RAW_HID_SRC_USB;
+
+raw_hid_src_t raw_hid_get_src(void) {
+    return raw_hid_src;
+}
+
+void raw_hid_set_src(raw_hid_src_t src) {
+    raw_hid_src = src;
+}
+
+void wireless_send_raw_hid(uint8_t *data, uint8_t length) {
+    if (wireless_get_state() != WT_CONNECTED) return;
+    if (wireless_transport.send_raw_hid) wireless_transport.send_raw_hid(data, length);
+}
+#endif
 
 /* Called when the BT device is reset. */
 static void wireless_enter_reset(uint8_t reason) {
@@ -513,6 +534,17 @@ void wireless_event_task(void) {
             case EVT_CONECTION_INTERVAL:
                 report_buffer_set_inverval(event.params.interval);
                 break;
+#ifdef RAW_ENABLE
+            case EVT_RAW_HID:
+                /* A Launcher/VIA request that arrived over the wireless link. Mark the
+                   source so the reply raw_hid_send() produces is routed back the same
+                   way instead of into the (idle) USB endpoint. */
+                raw_hid_set_src(RAW_HID_SRC_WIRELESS);
+                raw_hid_receive(event.params.raw_hid_data, RAW_EPSIZE);
+                raw_hid_set_src(RAW_HID_SRC_USB);
+                lpm_timer_reset();
+                break;
+#endif
             default:
                 break;
         }

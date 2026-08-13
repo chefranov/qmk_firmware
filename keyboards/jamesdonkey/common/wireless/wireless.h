@@ -59,6 +59,9 @@ typedef struct {
     void (*send_consumer)(uint16_t);
     void (*send_system)(uint16_t);
     void (*send_mouse)(uint8_t *);
+#ifdef RAW_ENABLE
+    void (*send_raw_hid)(uint8_t *, uint8_t);
+#endif
     void (*update_bat_level)(uint8_t);
     void (*task)(void);
 } wt_func_t;
@@ -76,6 +79,23 @@ void wireless_connect(void);
 void wireless_connect_ex(uint8_t host_idx, uint16_t timeout);
 void wireless_disconnect(void);
 void wireless_update_bat_level(uint8_t level);
+
+#ifdef RAW_ENABLE
+/* Source of the raw HID packet currently being processed. The wireless link carries
+   Launcher/VIA traffic too (the 2.4GHz receiver bridges it), and a reply has to go
+   back out the way the request came in. Upstream threads a `src` argument through
+   raw_hid_receive()/via_command_kb(); this fork keeps the stock QMK signatures and
+   tracks the source in one place instead, which is safe because raw HID is only ever
+   dispatched from the main loop. */
+typedef enum {
+    RAW_HID_SRC_USB = 0,
+    RAW_HID_SRC_WIRELESS,
+} raw_hid_src_t;
+
+raw_hid_src_t raw_hid_get_src(void);
+void          raw_hid_set_src(raw_hid_src_t src);
+void          wireless_send_raw_hid(uint8_t *data, uint8_t length);
+#endif
 
 void wireless_pairing(void);
 void wireless_pairing_ex(uint8_t host_idx, void *param);

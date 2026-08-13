@@ -507,11 +507,18 @@ void console_task(void) {
 #endif /* CONSOLE_ENABLE */
 
 #ifdef RAW_ENABLE
-void raw_hid_send(uint8_t *data, uint8_t length) {
+void usb_raw_hid_send(uint8_t *data, uint8_t length) {
     if (length != RAW_EPSIZE) {
         return;
     }
     send_report(USB_ENDPOINT_IN_RAW, data, length);
+}
+
+/* Weak so a keyboard can route the reply somewhere other than the USB endpoint - a
+   wireless keyboard reached through its receiver has to answer over the radio link.
+   The default remains USB. */
+__attribute__((weak)) void raw_hid_send(uint8_t *data, uint8_t length) {
+    usb_raw_hid_send(data, length);
 }
 
 __attribute__((weak)) void raw_hid_receive(uint8_t *data, uint8_t length) {
