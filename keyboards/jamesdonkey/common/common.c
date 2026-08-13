@@ -39,6 +39,10 @@
    reply has to leave by the same route - the USB endpoint is not connected then. */
 void raw_hid_send(uint8_t *data, uint8_t length) {
     if (raw_hid_get_src() == RAW_HID_SRC_WIRELESS) {
+        /* Note: an "unhandled command" reply must still go out. Launcher probes for
+           features this firmware does not implement (the 0xA7 group in particular) and
+           needs the negative answer to move on; swallowing it made every connection
+           take three timeouts. */
         wireless_send_raw_hid(data, length);
         return;
     }

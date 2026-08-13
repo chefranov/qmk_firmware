@@ -25,6 +25,9 @@
 #include "wireless_common.h"
 #include "task.h"
 #include "raw_hid.h"
+#ifdef VIA_ENABLE
+#    include "via.h"
+#endif
 
 #ifndef RAW_EPSIZE
 #    define RAW_EPSIZE 32
@@ -535,15 +538,46 @@ void wireless_event_task(void) {
                 report_buffer_set_inverval(event.params.interval);
                 break;
 #ifdef RAW_ENABLE
-            case EVT_RAW_HID:
+            case EVT_RAW_HID: {
                 /* A Launcher/VIA request that arrived over the wireless link. Mark the
                    source so the reply raw_hid_send() produces is routed back the same
-                   way instead of into the (idle) USB endpoint. */
+                   way instead of into the (idle) USB endpoint.
+
+                   The module raises this event on its own, not only when a host is
+                   actually talking to us - empty packets arrive with no Launcher running
+                   at all. Feeding those to VIA made it answer every one of them, which
+                   dropped SPI traffic and an lpm_timer_reset() into the sleep transition
+                   and left the board unable to wake. Verified on hardware: with this
+                   dispatch compiled out the board sleeps and wakes correctly, with it
+                   unguarded it dies as soon as the backlight goes off. So ignore a
+                   packet that carries no command at all. */
+                uint8_t *raw = event.params.raw_hid_data;
+                bool     any = false;
+                for (uint8_t i = 0; i < RAW_EPSIZE; i++) {
+                    if (raw[i]) {
+                        any = true;
+                        break;
+                    }
+                }
+                if (!any) break;
+
+#    ifdef VIA_ENABLE
+                /* Our own reply comes back to us as another receive event, and VIA
+                   answers that in turn - a ping-pong that floods the module's command
+                   FIFO and takes the link down with it. An unhandled-command reply is
+                   marked 0xFF in the first byte and is never something a host would
+                   ask for, so treat it as the echo it is. Verified on hardware: with
+                   the replies suppressed entirely the board slept and woke fine but
+                   Launcher needed three attempts to connect; dropping only the echo
+                   keeps both. */
+                if (raw[0] == id_unhandled) break;
+#    endif
+
                 raw_hid_set_src(RAW_HID_SRC_WIRELESS);
-                raw_hid_receive(event.params.raw_hid_data, RAW_EPSIZE);
+                raw_hid_receive(raw, RAW_EPSIZE);
                 raw_hid_set_src(RAW_HID_SRC_USB);
                 lpm_timer_reset();
-                break;
+            } break;
 #endif
             default:
                 break;
